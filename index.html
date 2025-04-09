@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAV Audio Player</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Add wavesurfer.js for better WAV support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.4/wavesurfer.min.js"></script>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #a29bfe;
+            --dark: #2d3436;
+            --light: #dfe6e9;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .player {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        .album-art {
+            width: 250px;
+            height: 250px;
+            margin: 0 auto 1rem;
+            border-radius: 1rem;
+            background: var(--light);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .album-art img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .track-info {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .track-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--dark);
+            margin: 0;
+        }
+
+        .track-artist {
+            font-size: 0.9rem;
+            color: #666;
+            margin: 0.5rem 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--light);
+            border-radius: 3px;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 3px;
+            transition: width 0.1s linear;
+            position: relative;
+        }
+
+        .progress::after {
+            content: '';
+            position: absolute;
+            right: -4px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .progress-bar:hover .progress::after {
+            opacity: 1;
+        }
+
+        .time {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            color: var(--dark);
+            background: rgba(223, 230, 233, 0.3);
+        }
+
+        .control-btn i {
+            font-size: 1.2rem;
+        }
+
+        .control-btn:hover {
+            background: var(--light);
+            transform: scale(1.1);
+        }
+
+        .play-btn {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            width: 60px;
+            height: 60px;
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+        }
+
+        .play-btn i {
+            font-size: 1.5rem;
+        }
+
+        .play-btn:hover {
+            background: linear-gradient(45deg, var(--secondary), var(--primary));
+            transform: scale(1.1) rotate(180deg);
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: rgba(223, 230, 233, 0.3);
+            border-radius: 1rem;
+        }
+
+        .volume-icon {
+            color: var(--dark);
+            width: 24px;
+            text-align: center;
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 4px;
+            -webkit-appearance: none;
+            background: var(--light);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .playing .play-btn {
+            animation: pulse 2s infinite;
+        }
+
+        #waveform {
+            width: 100%;
+            height: 60px;
+            margin-bottom: 1rem;
+            background: rgba(223, 230, 233, 0.3);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        /* Error message styling */
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            font-size: 0rem;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="player">
+        <!-- Hidden audio element -->
+        <audio id="audio-player" preload="metadata" style="display:none;">
+            <source src="abc.wav" type="audio/wav">
+            <source src="abc.wav" type="audio/x-wav">
+            Your browser does not support the audio element.
+        </audio>
+        
+        <!-- Starting with the album art - removed all elements above it -->
+        <div class="album-art">
+            <img src="image.jpeg" alt="Album Art" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNTAiIGhlaWdodD0iMjUwIiB2aWV3Qm94PSIwIDAgMjUwIDI1MCIgZmlsbD0ibm9uZSI+PHJlY3Qgd2lkdGg9IjI1MCIgaGVpZ2h0PSIyNTAiIGZpbGw9IiNkZmU2ZTkiLz48cGF0aCBkPSJNMTI1IDgwQzEwNC4wMSA4MCA4Ny4wMyA5Ni45OCA4Ny4wMyAxMTcuOTdDODcuMDMgMTM4Ljk2IDEwNC4wMSAxNTUuOTQgMTI1IDE1NS45NEMxNDUuOTkgMTU1Ljk0IDE2Mi45NyAxMzguOTYgMTYyLjk3IDExNy45N0MxNjIuOTcgOTYuOTggMTQ1Ljk5IDgwIDEyNSA4MFpNOTAuNiAxODBDNzEuNCAxODAgNTYgMTk1LjQgNTYgMjE0LjZWMjIzLjA0SDE5NFYyMTQuNkMxOTQgMTk1LjQgMTc4LjYgMTgwIDE1OS40IDE4MEgxNTIuMTJDMTQzLjc4IDE4NC4xNCAxMzQuNyAxODYuMzkgMTI1IDE4Ni4zOUMxMTUuMyAxODYuMzkgMTA2LjI5IDE4NC4xNCA5Ny44OCAxODBIOTAuNloiIGZpbGw9IiM5NWE1YTYiLz48L3N2Zz4='">
+        </div>
+        
+        <div class="track-info">
+            <h2 class="track-title">Via Infinita </h2>
+            <p class="track-artist">Estiva </p>
+        </div>
+        
+        
+        
+        <div class="progress-bar">
+            <div class="progress"></div>
+        </div>
+        
+        <div class="time">
+            <span class="current-time">0:00</span>
+            <span class="total-time">0:00</span>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn" id="prev-btn">
+                <i class="fas fa-backward-step"></i>
+            </button>
+            <button class="control-btn play-btn" id="play-btn">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="control-btn" id="next-btn">
+                <i class="fas fa-forward-step"></i>
+            </button>
+        </div>
+        
+        <div class="volume-control">
+            <i class="fas fa-volume-high volume-icon"></i>
+            <input type="range" class="volume-slider" min="0" max="100" value="80">
+        </div>
+        
+        <!-- Error message at the bottom -->
+        <div class="error-message" id="error-message"></div>
+    </div>
+
+    <script>
+        // Initialize variables
+        const audioPlayer = document.getElementById('audio-player');
+        const player = document.querySelector('.player');
+        const playBtn = document.querySelector('.play-btn');
+        const playIcon = playBtn.querySelector('i');
+        const progress = document.querySelector('.progress');
+        const progressBar = document.querySelector('.progress-bar');
+        const currentTimeEl = document.querySelector('.current-time');
+        const totalTimeEl = document.querySelector('.total-time');
+        const volumeIcon = document.querySelector('.volume-icon');
+        const volumeSlider = document.querySelector('.volume-slider');
+        const errorMessage = document.getElementById('error-message');
+        
+        // Initialize WaveSurfer with error handling
+        let wavesurfer;
+        try {
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#a29bfe',
+                progressColor: '#6c5ce7',
+                cursorColor: 'transparent',
+                barWidth: 2,
+                barRadius: 3,
+                responsive: true,
+                height: 60,
+                normalize: true,
+                backend: 'WebAudio'
+            });
+            
+            // Add error handling for WaveSurfer
+            wavesurfer.on('error', function(err) {
+                console.error('WaveSurfer error:', err);
+                errorMessage.textContent = 'Error loading audio: ' + err;
+                errorMessage.classList.add('show');
+                
+                // Try to fall back to native audio player
+                tryNativeAudioPlayer();
+            });
+            
+        } catch (e) {
+            console.error('WaveSurfer initialization error:', e);
+            errorMessage.textContent = 'Could not initialize audio player: ' + e.message;
+            errorMessage.classList.add('show');
+            
+            // Try to fall back to native audio player
+            tryNativeAudioPlayer();
+        }
+        
+        // Try to load the WAV file
+        try {
+            if (wavesurfer) {
+                wavesurfer.load('abc.wav');
+                
+                // Add ready event listener
+                wavesurfer.on('ready', function() {
+                    totalTimeEl.textContent = formatTime(wavesurfer.getDuration());
+                    
+                    // Set initial volume
+                    wavesurfer.setVolume(volumeSlider.value / 100);
+                    audioPlayer.volume = volumeSlider.value / 100;
+                });
+            } else {
+                tryNativeAudioPlayer();
+            }
+        } catch (e) {
+            console.error('Error loading audio:', e);
+            errorMessage.textContent = 'Error loading audio: ' + e.message;
+            errorMessage.classList.add('show');
+            
+            // Try to fall back to native audio player
+            tryNativeAudioPlayer();
+        }
+        
+        // Try to use the native audio player as fallback
+        function tryNativeAudioPlayer() {
+            if (audioPlayer) {
+                // Make sure audio element is visible and ready
+                audioPlayer.style.display = 'block';
+                audioPlayer.style.width = '100%';
+                audioPlayer.style.marginBottom = '1rem';
+            }
+        }
+        
+        // Format time in minutes and seconds
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            seconds = Math.floor(seconds % 60);
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Play/Pause functionality
+        playBtn.addEventListener('click', () => {
+            if (wavesurfer && wavesurfer.isReady) {
+                try {
+                    wavesurfer.playPause();
+                } catch (e) {
+                    console.error('Error playing/pausing:', e);
+                    if (audioPlayer.paused) {
+                        audioPlayer.play().catch(e => console.error('Audio playback error:', e));
+                    } else {
+                        audioPlayer.pause();
+                    }
+                }
+            } else if (audioPlayer) {
+                if (audioPlayer.paused) {
+                    audioPlayer.play().catch(e => console.error('Audio playback error:', e));
+                } else {
+                    audioPlayer.pause();
+                }
+            }
+        });
+
+        // Set up WaveSurfer events
+        if (wavesurfer) {
+            // WaveSurfer play/pause events
+            wavesurfer.on('play', function() {
+                playIcon.className = 'fas fa-pause';
+                player.classList.add('playing');
+                try {
+                    if (audioPlayer.paused) {
+                        audioPlayer.play().catch(e => console.error('Audio playback error:', e));
+                    }
+                } catch (e) {
+                    console.error('Error on play event:', e);
+                }
+            });
+            
+            wavesurfer.on('pause', function() {
+                playIcon.className = 'fas fa-play';
+                player.classList.remove('playing');
+                try {
+                    if (!audioPlayer.paused) {
+                        audioPlayer.pause();
+                    }
+                } catch (e) {
+                    console.error('Error on pause event:', e);
+                }
+            });
+            
+            // Update time display
+            wavesurfer.on('audioprocess', function() {
+                try {
+                    const currentTime = wavesurfer.getCurrentTime();
+                    currentTimeEl.textContent = formatTime(currentTime);
+                    
+                    // Update progress bar
+                    const percent = (currentTime / wavesurfer.getDuration()) * 100;
+                    progress.style.width = `${percent}%`;
+                } catch (e) {
+                    console.error('Error updating time display:', e);
+                }
+            });
+            
+            // Click on progress bar to seek
+            progressBar.addEventListener('click', function(e) {
+                if (!wavesurfer || !wavesurfer.isReady) return;
+                
+                try {
+                    const rect = progressBar.getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    wavesurfer.seekTo(percent);
+                    
+                    if (audioPlayer.duration) {
+                        audioPlayer.currentTime = percent * audioPlayer.duration;
+                    }
+                } catch (e) {
+                    console.error('Error seeking:', e);
+                }
+            });
+        }
+        
+        // Set up native audio player events as fallback
+        audioPlayer.addEventListener('loadedmetadata', function() {
+            if (!wavesurfer || !wavesurfer.isReady) {
+                totalTimeEl.textContent = formatTime(audioPlayer.duration);
+            }
+        });
+        
+        audioPlayer.addEventListener('timeupdate', function() {
+            if (!wavesurfer || !wavesurfer.isReady) {
+                currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+                
+                // Update progress bar
+                const percent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                progress.style.width = `${percent}%`;
+            }
+        });
+        
+        audioPlayer.addEventListener('play', function() {
+            playIcon.className = 'fas fa-pause';
+            player.classList.add('playing');
+        });
+        
+        audioPlayer.addEventListener('pause', function() {
+            playIcon.className = 'fas fa-play';
+            player.classList.remove('playing');
+        });
+        
+        audioPlayer.addEventListener('error', function(e) {
+            console.error('Audio element error:', e);
+            errorMessage.textContent = 'Error loading audio: ' + (audioPlayer.error ? audioPlayer.error.message : 'Unknown error');
+            errorMessage.classList.add('show');
+        });
+
+        // Volume control
+        volumeSlider.addEventListener('input', function(e) {
+            const value = e.target.value;
+            
+            try {
+                // Update WaveSurfer volume if available
+                if (wavesurfer && wavesurfer.isReady) {
+                    wavesurfer.setVolume(value / 100);
+                }
+                
+                // Always update audio element volume as fallback
+                audioPlayer.volume = value / 100;
+                
+                // Update volume icon
+                if (value == 0) {
+                    volumeIcon.className = 'fas fa-volume-mute';
+                } else if (value < 50) {
+                    volumeIcon.className = 'fas fa-volume-low';
+                } else {
+                    volumeIcon.className = 'fas fa-volume-high';
+                }
+            } catch (e) {
+                console.error('Error setting volume:', e);
+            }
+        });
+
+        // Handle prev/next buttons
+        document.getElementById('prev-btn').addEventListener('click', function() {
+            // Implementation for previous track
+            try {
+                if (wavesurfer && wavesurfer.isReady) {
+                    wavesurfer.stop();
+                }
+                audioPlayer.currentTime = 0;
+                // You could load previous track here
+            } catch (e) {
+                console.error('Error on prev button:', e);
+            }
+        });
+
+        document.getElementById('next-btn').addEventListener('click', function() {
+            // Implementation for next track
+            try {
+                if (wavesurfer && wavesurfer.isReady) {
+                    wavesurfer.stop();
+                }
+                audioPlayer.currentTime = 0;
+                // You could load next track here
+            } catch (e) {
+                console.error('Error on next button:', e);
+            }
+        });
+    </script>
+</body>
+</html>
